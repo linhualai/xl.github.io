@@ -1,0 +1,60 @@
+.post{
+  h2.title {
+    a{
+      color: #666;
+      transition: color 0.3s;
+      line-height: 24px;
+      @media not screen and (max-width: 600px), not screen and (max-width: 766px) {
+        &:hover { color: $color-main; }
+      }
+    }
+  }
+
+	h1.title, .entry-content{
+		@media screen and (max-width: 766px){
+			margin-left: 0;
+		}
+	}
+	.meta{
+		position: absolute;
+		top: 85px;
+		line-height: 2;
+		font-size: 0.9em;
+		color: $color-gray02;
+		width: 230px;
+		margin-top: 15px;
+		@media screen and (max-width: 766px){
+			position: static;
+			width: auto;
+		}
+		a{
+      color: $color-gray02;
+      transition: color 0.3s;
+      @media not screen and (max-width: 600px), not screen and (max-width: 766px) {
+        &:hover {
+          text-decoration: underline;
+          color: $color-gray01;
+        }
+      }
+		}
+		.date, .tags, .commit, .notes {
+      i {
+        color: $color-gray03;
+        margin-right: 2px;
+        font-size: 1.3em;
+        line-height: 1.6em;
+        cursor: default;
+
+        @media not screen and (max-width: 600px){
+          vertical-align: bottom;
+        }
+      }
+			position: relative;
+			@media screen and (max-width: 766px){
+        display: inline-block;
+				margin-right: 30px;
+			}
+		}
+		.commit .hash { font-family: $font-mono; }
+	}
+}

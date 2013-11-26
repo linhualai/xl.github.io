@@ -144,8 +144,8 @@
 <p>当然实际的存储不会这么简单。每一张表的文件都会有一些附加的存储文件，如文件名后加上 _fsm 的是空闲空间映射表 (Free Space Map)。另外 base/(dboid)/(relfilenode) 这个文件超过 1GB 以后，Postgres 会把这个文件拆分成不超过 1G 的多个文件，文件末尾加上 .1 .2 .3 … 做编号。 如 24589 24589.1 24589.2 。据说这是因为某些文件系统支持的最大文件大小有限制(如 fat32 只支持最大 4G )的文件。</p></div>
   <div class="meta">
     <div class="date"><i class="fa fa-calendar fa-fw"></i> November 21, 2013</div>
-    <div class="tags"><i class="fa fa-tags fa-fw"></i> <a href="/tags/db/">DB</a>, <a href="/tags/postgres/">Postgres</a>, <a href="/tags/algorithm/">Algorithm</a></div>
-    <div class="commit"><i class="fa fa-code-fork fa-fw"></i> <a href='https://github.com/xl/xl.github.io/commits/source/provider/posts/postgres-storage-location.md'>History</a><span class='hash'>, <a href='https://github.com/xl/xl.github.io/commit/534e1e8' title='pg lz compress algorithm'>534e1e8</a></span></div>
+    <div class="tags"><i class="fa fa-tags fa-fw"></i> <a href="/tags/db/">DB</a>, <a href="/tags/postgres/">Postgres</a></div>
+    <div class="commit"><i class="fa fa-code-fork fa-fw"></i> <a href='https://github.com/xl/xl.github.io/commits/source/provider/posts/postgres-storage-location.md'>History</a><span class='hash'>, <a href='https://github.com/xl/xl.github.io/commit/1ceb7e8' title='tag miss'>1ceb7e8</a></span></div>
   </div>
 </article>
 <section id="comment">

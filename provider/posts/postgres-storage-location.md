@@ -2,7 +2,7 @@
 title: Postgres 的文件存储位置
 published: 2013-11-21
 excerpt: 
-tags: DB, Postgres, Algorithm
+tags: DB, Postgres
 ---
 
 

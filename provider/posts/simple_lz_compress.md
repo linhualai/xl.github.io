@@ -2,7 +2,7 @@
 title: Postgres 中的简单压缩算法
 published: 2013-11-27
 excerpt: 
-tags: DB
+tags: DB, Postgres, Algorithm
 ---
 
 Postgres 的页面(page)大小是固定的 8k，同一行的数据必须在同也个页面内，但是 Postgres 需要支持变长的数据类型(如 varchar)，是可能超过 8k 的。解决方案是所谓的 [TOAST](http://www.postgresql.org/docs/current/static/storage-toast.html) (The Oversized-Attribute Storage Technique, 过长字段存储技术)。

@@ -1,0 +1,235 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>在 Haskell 中使用 Continuation 实现单线程并发控制 - Tech Notes</title>
+  <meta name="author" content="Tech Notes">
+  <meta name="description" content="Posts">
+
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link href="/favicon.png" rel="shortcut icon">
+  <link href='http://fonts.googleapis.com/css?family=Noto+Sans:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+  <link href='http://fonts.googleapis.com/css?family=Merriweather:900italic,900,700italic,400italic,700,400' rel='stylesheet' type='text/css'>
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.0/css/font-awesome.css" rel="stylesheet">
+  <link href='/css/screen.css' rel='stylesheet' type='text/css' media='screen' />
+  <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/atom.xml" />
+  <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+  <![endif]-->
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+  <script src='/js/blaenk.js' type='text/javascript'></script>
+</head>
+<body>
+  <div id="strip"></div>
+  <header id="header" class="inner">
+    <div id="stamp">
+      <h1><a href="/">Tech Notes</a></h1>
+      <h4>Posts</h4>
+    </div>
+    <nav id="main-nav">
+      <ul class="main">
+        <li><a href="/about/">About</a></li>
+		<!-- links
+        <li><a href="/work/">Work</a></li>
+        <li><a href="/lately/">Lately</a></li>
+		links !-->
+        <li><a href="/notes/">Notes</a></li>
+        <li><a id="search_btn">Search</a></li>
+      </ul>
+      <form class="desk_search" action="http://google.com/search" method="get">
+        <input type="text" name="q" results="0" placeholder="Search... (Click 'Search' to hide)" autocomplete="off" spellcheck="false">
+        <input type="hidden" name="q" value="site:veryr.com">
+      </form>
+    </nav>
+    <nav id="mobile-nav">
+      <div class="alignleft menu">
+        <a class="button">Menu</a>
+        <div class="container">
+          <ul class="main">
+            <li><a href="/about/">About</a></li>
+		<!-- links
+            <li><a href="/work/">Work</a></li>
+            <li><a href="/lately/">Lately</a></li>
+		links !-->
+            <li><a href="/notes/">Notes</a></li>
+            <li><a id="search_btn">Search</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="alignright search">
+        <a class="button"></a>
+        <div class="container">
+          <form action="http://google.com/search" method="get">
+            <input type="text" name="q" results="0">
+            <input type="hidden" name="q" value="site:veryr.com">
+          </form>
+        </div>
+      </div>
+    </nav>
+  </header>
+  <div id="content" class="inner">
+    <article class="post">
+  <h2 class="title"><a href="/posts/continuation-based-thread-in-haskell/"><span>在 Haskell 中使用 Continuation 实现单线程并发控制</span></a></h2>
+  <div class="entry-content"><p>之前在 <a href="http://scheme.com/tspl4/further.html#./further:h3">Section 3.3. Continuations</a> 看到 Scheme 实现的一个用 call/cc 模拟的多任务程序, 还挺好玩的:</p>
+<figure class="code"><div class="code-container scheme"><div class="highlight"><pre>    <span class="p">(</span><span class="k">define </span><span class="nv">lwp-list</span> <span class="o">&#39;</span><span class="p">())</span>
+    <span class="p">(</span><span class="k">define </span><span class="nv">lwp</span>
+      <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">thunk</span><span class="p">)</span>
+        <span class="p">(</span><span class="k">set! </span><span class="nv">lwp-list</span> <span class="p">(</span><span class="nb">append </span><span class="nv">lwp-list</span> <span class="p">(</span><span class="nb">list </span><span class="nv">thunk</span><span class="p">)))))</span>
+
+    <span class="p">(</span><span class="k">define </span><span class="nv">start</span>
+      <span class="p">(</span><span class="k">lambda </span><span class="p">()</span>
+        <span class="p">(</span><span class="k">let </span><span class="p">([</span><span class="nv">p</span> <span class="p">(</span><span class="nb">car </span><span class="nv">lwp-list</span><span class="p">)])</span>
+          <span class="p">(</span><span class="k">set! </span><span class="nv">lwp-list</span> <span class="p">(</span><span class="nb">cdr </span><span class="nv">lwp-list</span><span class="p">))</span>
+          <span class="p">(</span><span class="nf">p</span><span class="p">))))</span>
+
+    <span class="p">(</span><span class="k">define </span><span class="nv">pause</span>
+      <span class="p">(</span><span class="k">lambda </span><span class="p">()</span>
+        <span class="p">(</span><span class="nf">call/cc</span>
+          <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">k</span><span class="p">)</span>
+            <span class="p">(</span><span class="nf">lwp</span> <span class="p">(</span><span class="k">lambda </span><span class="p">()</span> <span class="p">(</span><span class="nf">k</span> <span class="no">#f</span><span class="p">)))</span>
+            <span class="p">(</span><span class="nf">start</span><span class="p">)))))</span>
+
+    <span class="p">(</span><span class="nf">lwp</span> <span class="p">(</span><span class="k">lambda </span><span class="p">()</span> <span class="p">(</span><span class="k">let </span><span class="nv">f</span> <span class="p">()</span> <span class="p">(</span><span class="nf">pause</span><span class="p">)</span> <span class="p">(</span><span class="nb">display </span><span class="s">&quot;h&quot;</span><span class="p">)</span> <span class="p">(</span><span class="nf">f</span><span class="p">))))</span>
+    <span class="p">(</span><span class="nf">lwp</span> <span class="p">(</span><span class="k">lambda </span><span class="p">()</span> <span class="p">(</span><span class="k">let </span><span class="nv">f</span> <span class="p">()</span> <span class="p">(</span><span class="nf">pause</span><span class="p">)</span> <span class="p">(</span><span class="nb">display </span><span class="s">&quot;e&quot;</span><span class="p">)</span> <span class="p">(</span><span class="nf">f</span><span class="p">))))</span>
+    <span class="p">(</span><span class="nf">lwp</span> <span class="p">(</span><span class="k">lambda </span><span class="p">()</span> <span class="p">(</span><span class="k">let </span><span class="nv">f</span> <span class="p">()</span> <span class="p">(</span><span class="nf">pause</span><span class="p">)</span> <span class="p">(</span><span class="nb">display </span><span class="s">&quot;y&quot;</span><span class="p">)</span> <span class="p">(</span><span class="nf">f</span><span class="p">))))</span>
+    <span class="p">(</span><span class="nf">lwp</span> <span class="p">(</span><span class="k">lambda </span><span class="p">()</span> <span class="p">(</span><span class="k">let </span><span class="nv">f</span> <span class="p">()</span> <span class="p">(</span><span class="nf">pause</span><span class="p">)</span> <span class="p">(</span><span class="nb">display </span><span class="s">&quot;!&quot;</span><span class="p">)</span> <span class="p">(</span><span class="nf">f</span><span class="p">))))</span>
+    <span class="p">(</span><span class="nf">lwp</span> <span class="p">(</span><span class="k">lambda </span><span class="p">()</span> <span class="p">(</span><span class="k">let </span><span class="nv">f</span> <span class="p">()</span> <span class="p">(</span><span class="nf">pause</span><span class="p">)</span> <span class="p">(</span><span class="nf">newline</span><span class="p">)</span> <span class="p">(</span><span class="nf">f</span><span class="p">))))</span>
+    <span class="p">(</span><span class="nf">start</span><span class="p">)</span>
+</pre></div>
+</div></figure>
+<p>这个程序会不断地输出: &gt;hey! &gt;hey! &gt;hey! &gt;hey! &gt;…</p>
+<h2 id="热身">热身</h2>
+<p>我估摸着吧, Haskell 里的 callCC 也可以这么玩，不过 Haskell 里面没有副作用，也就没有赋值，这个 <code>set!</code> 就需要绕个弯子, 借助 IORef 来实现了。</p>
+<figure class="code"><div class="code-container haskell"><div class="highlight"><pre><span class="kr">import</span> <span class="nn">Control.Monad.Cont</span>
+<span class="kr">import</span> <span class="nn">Data.IORef</span>
+
+<span class="nf">main</span> <span class="ow">=</span> <span class="p">(`</span><span class="n">runContT</span><span class="p">`</span> <span class="n">return</span><span class="p">)</span> <span class="o">$</span> <span class="kr">do</span>
+    <span class="n">ref</span> <span class="ow">&lt;-</span> <span class="n">lift</span> <span class="o">$</span> <span class="n">newIORef</span> <span class="n">undefined</span>
+    <span class="n">callCC</span> <span class="o">$</span> <span class="nf">\</span><span class="n">k</span> <span class="ow">-&gt;</span> <span class="n">lift</span> <span class="o">$</span> <span class="n">writeIORef</span> <span class="n">ref</span> <span class="n">k</span>
+    <span class="n">lift</span> <span class="o">$</span> <span class="n">putStrLn</span> <span class="s">&quot;print once&quot;</span>
+    <span class="n">continue</span> <span class="ow">&lt;-</span> <span class="n">lift</span> <span class="o">$</span> <span class="n">readIORef</span> <span class="n">ref</span>
+    <span class="n">continue</span> <span class="nb">()</span>
+</pre></div>
+</div></figure>
+<p>稍微解释一下：这个程序会不断地打印 “print once”. 程序的执行过程是这样的，callCC 把 callCC 之后的三行代码绑定到 k 上了， 然后把 k 保存到 ref 里面。 这后三行代码呢，打印一个行 “print once”, 然后把保存在 ref 里的 k 拿出来，继续执行, 跳转到 callCC 那去了。 这样就形成了一个死循环，不断打印。</p>
+<h2 id="模拟">模拟</h2>
+<p>接下来就简单了，依葫芦画瓢抡一个 Haskell 版本的 light weight process 了 :</p>
+<figure class="code"><div class="code-container haskell"><div class="highlight"><pre>    <span class="kr">import</span> <span class="nn">Control.Monad.Cont</span>
+    <span class="kr">import</span> <span class="nn">Data.IORef</span>
+
+    <span class="n">pause</span> <span class="n">ref</span> <span class="ow">=</span> <span class="n">callCC</span> <span class="o">$</span> <span class="nf">\</span><span class="n">k</span> <span class="ow">-&gt;</span> <span class="kr">do</span>
+        <span class="n">lwp</span> <span class="n">ref</span> <span class="p">(</span><span class="n">k</span> <span class="nb">()</span><span class="p">)</span>
+        <span class="n">start</span> <span class="n">ref</span>
+
+    <span class="n">start</span> <span class="n">ref</span> <span class="ow">=</span> <span class="kr">do</span>
+        <span class="p">(</span><span class="n">t</span><span class="kt">:</span><span class="n">ts</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">lift</span> <span class="o">$</span> <span class="n">readIORef</span> <span class="n">ref</span>
+        <span class="n">lift</span> <span class="o">$</span> <span class="n">writeIORef</span> <span class="n">ref</span> <span class="n">ts</span>
+        <span class="n">t</span>
+
+    <span class="n">lwp</span> <span class="n">ref</span> <span class="n">t</span> <span class="ow">=</span> <span class="n">lift</span> <span class="o">$</span> <span class="n">modifyIORef</span> <span class="n">ref</span> <span class="o">$</span> <span class="nf">\</span><span class="n">ts</span> <span class="ow">-&gt;</span> <span class="n">ts</span> <span class="o">++</span> <span class="p">[</span><span class="n">t</span><span class="p">]</span>
+
+    <span class="n">main</span> <span class="ow">=</span> <span class="p">(`</span><span class="n">runContT</span><span class="p">`</span> <span class="n">return</span><span class="p">)</span> <span class="o">$</span> <span class="kr">do</span>
+        <span class="n">ref</span> <span class="ow">&lt;-</span> <span class="n">lift</span> <span class="o">$</span> <span class="n">newIORef</span> <span class="kt">[]</span>
+        <span class="n">lwp</span> <span class="n">ref</span> <span class="o">.</span> <span class="n">forever</span> <span class="o">$</span> <span class="kr">do</span>
+            <span class="n">pause</span> <span class="n">ref</span>
+            <span class="n">lift</span> <span class="o">$</span> <span class="n">putStrLn</span> <span class="s">&quot;Hello&quot;</span>
+        <span class="n">lwp</span> <span class="n">ref</span> <span class="o">.</span> <span class="n">forever</span> <span class="o">$</span> <span class="kr">do</span>
+            <span class="n">pause</span> <span class="n">ref</span>
+            <span class="n">lift</span> <span class="o">$</span> <span class="n">putStrLn</span> <span class="s">&quot;World&quot;</span>
+        <span class="n">start</span> <span class="n">ref</span>
+</pre></div>
+</div></figure>
+<p>这个程序呢，不断打印 “Hello World”, 几乎就是原来 Scheme 版本的一一对应， 没啥好解释的了。</p>
+<h2 id="后话">后话</h2>
+<p>ps: The Scheme Programming Language 真是一本好书。 前三章就把 Scheme 编程的要素讲完了， 包括 Continuation, CPS, 宏定义等都讲透了， 后面九章就是具体解释和应用了。Kent Dybvig 端的是功力深厚，学术一流，工程能力也没话说, Chez petite 编译器不管易用性，性能都是一等一的。话说作者还把这本书公开放在网上了: http://www.scheme.com/tspl4/ , 真的是功德无量哈。SICP 固然是好书，不过里面讲 Scheme 的东西其实不多，看过 SICP 的来看这本，想必会如或至宝。SICP 练就一身内力，不过不好使出来 (小测验: 用 Scheme 编写一个文件读写的程序?), 这本 TSPL 就是教你太极招式的好书。</p>
+<h2 id="参考文献">参考文献</h2>
+<ol type="1">
+<li><a href="http://scheme.com/tspl4">The Scheme Programming Language</a></li>
+</ol></div>
+  <div class="meta">
+    <div class="date"><i class="fa fa-calendar fa-fw"></i> August 23, 2012</div>
+    <div class="tags"><i class="fa fa-tags fa-fw"></i> <a href="/tags/haskell/">Haskell</a>, <a href="/tags/scheme/">Scheme</a></div>
+    <div class="commit"><i class="fa fa-code-fork fa-fw"></i> <a href='https://github.com/xl/xl.github.io/commits/source/provider/posts/continuation-based-thread-in-haskell.md'>History</a><span class='hash'>, <a href='https://github.com/xl/xl.github.io/commit/8d1b1a0' title='fork from blaenk'>8d1b1a0</a></span></div>
+  </div>
+</article>
+<section id="comment">
+  <div id="disqus_thread" aria-live="polite">
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  </div>
+</section>
+
+
+
+  </div>
+  <footer id="footer" class="inner">
+    <span id="social">
+      <a href="https://github.com/xl" title="github"><i class="fa fa-github-alt"></i></a>
+      &middot;
+      <a href="https://twitter.com/linhua" title="twitter"><i class="fa fa-twitter"></i></a>
+      &middot;
+      <a href="mailto:linhua.lai@gmail.com" title="email"><i class="fa fa-envelope"></i></a>
+      &middot;
+      <a href="/atom.xml" title="feed"><i class="fa fa-rss-square"></i></a>
+    </span>
+  </footer>
+  <!-- disqus -->
+<script async="true" type="text/javascript">
+  var disqus_shortname = 'veryr';
+  var disqus_identifier = 'http://veryr.com/posts/continuation-based-thread-in-haskell/';
+  var disqus_url = 'http://veryr.com/posts/continuation-based-thread-in-haskell/';
+  var disqus_script = 'embed.js';
+
+  (function () {
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  }());
+
+  jQuery(function (){
+    jQuery(window).bind('orientationchange', function() {
+      DISQUS.reset({
+        reload: true,
+        config: function() {
+          this.page.identifier = 'http://veryr.com/posts/continuation-based-thread-in-haskell/'
+          this.page.url = 'http://veryr.com/posts/continuation-based-thread-in-haskell/'
+        }
+      });
+    });
+  });
+</script>
+
+  <!-- google analytics -->
+  <script async="true" type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-37339861-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+  <!--MathJax CDN-->
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      messageStyle: "none"
+    });
+
+    MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready', function() {
+      var HTMLCSS = MathJax.OutputJax['HTML-CSS'];
+      HTMLCSS.Font.testSize = ['10px', '12px', '15px', '9px', '8px']
+      document.getElementById('MathJax_Font_Test').style.fontSize = '10px'
+    });
+
+    MathJax.Hub.Register.StartupHook('End', function() {
+      jQuery('.MathJax_Display').parent('.math').addClass('mobile-math');
+    });
+  </script>
+  <script async="true" type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML">
+  </script>
+</body>
+</html>

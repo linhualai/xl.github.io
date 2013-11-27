@@ -5,13 +5,13 @@ excerpt:
 tags: DB, Postgres, Algorithm
 ---
 
-Postgres 的页面(page)大小是固定的 8k，同一行的数据必须在同也个页面内，但是 Postgres 需要支持变长的数据类型(如 varchar)，是可能超过 8k 的。解决方案是所谓的 [TOAST](http://www.postgresql.org/docs/current/static/storage-toast.html) (The Oversized-Attribute Storage Technique, 过长字段存储技术)。
+Postgres 的页面(page)大小是固定的 8k，同一行的数据必须在同一个页面内，但是 Postgres 需要支持变长的数据类型(如 varchar)，是可能超过 8k 的。解决方案是所谓的 [TOAST](http://www.postgresql.org/docs/current/static/storage-toast.html) (The Oversized-Attribute Storage Technique, 过长字段存储技术)。
 
-TOAST 解决的思路一个是压缩，一个是页外存储。两个可以结合：页外压缩存储。页外存储就是在每个有变长字段表的 table 存储文件外再创建一个 .toast 结尾文件，过长字段存放在 .toast 文件，并将 offset 放在原 table 文件中替代。
+TOAST 解决的思路一个是压缩，一个是页外存储。两个可以结合：页外压缩存储。页外存储就是在每个有变长字段表的 table 存储文件外再创建一个 .toast 结尾文件，过长字段存放在 .toast 文件，并将 offset 放在原 table 文件中替代。这样还能提高扫表的速度(如果此次查询不需要这个字段的话)。
 
 Postgres 的压缩采用的是一个极简单的 lz 字典压缩算法。从解压过程来理解其原理的话非常简单：
 
-    sp= 11110000 | 0x41 | 0x41 | 0x42 | 0x43 | 0x01 | 0x00 | 0x05 | 0x00 | 0x09 | 0x00 | 0x0f | 0x00  | 0x0e  |
+    sp= 11110000 | 0x41 | 0x42 | 0x43 | 0x44 | 0x01 | 0x00 | 0x05 | 0x00 | 0x09 | 0x00 | 0x0f | 0x00  | 0x0e  |
         ———————————————————————————————————————————————————————————————————————————————————————————————————————
         control  | data | data | data | data | len4 + off12| len4 + off12| len4 + off12| len4 + off12 | len8  |
         ———————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -29,7 +29,7 @@ Postgres 的压缩采用的是一个极简单的 lz 字典压缩算法。从解�
     dp= ABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCD
 
 
-sp = [oxf0,0x41,0x41,0x41,0x41,0x01,0x00,0x05,0x00,0x09,0x00,0x0d,0x00,0x0e] 这样的一个压缩串能解压成什么呢？首先，先读一个 control byte，在这个例子里面就是 0xf0，也就是二进制的 11110000。从最低位开始看：
+sp = [oxf0,0x41,0x42,0x43,0x44,0x01,0x00,0x05,0x00,0x09,0x00,0x0d,0x00,0x0e] 这样的一个压缩串能解压成什么呢？首先，先读一个 control byte，在这个例子里面就是 0xf0，也就是二进制的 11110000。从最低位开始看：
 
 * 每看到一个 0 bit，就将 sp 的下一个字节原样写到结果 dp 里。
 * 每看到一个 1 bit，就再读两个字节 byte1 和 byte2, len = [byte1 的低4位] + 3，off = [byte1 的高4位] * 256 + [byte2]。如果 len == 18, 那么再读一个字节 byte3，len += byte3。然后从 dp 的末尾往前 off 个字节拷贝 len 个字节到 dp 里。

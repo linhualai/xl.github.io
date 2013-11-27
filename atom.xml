@@ -34,7 +34,7 @@
     ||||  |     |          |                       |
     ||||{4-}{---8--}{------16------}{--------------32--------------}
 dp= ABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCDABCD</code></pre>
-<p>sp = [oxf0,0x41,0x42,0x43,0x44,0x01,0x00,0x05,0x00,0x09,0x00,0x0d,0x00,0x0e] 这样的一个压缩串能解压成什么呢？首先，先读一个 control byte，在这个例子里面就是 0xf0，也就是二进制的 11110000。从最低位开始看：</p>
+<p>sp = [oxf0,0x41,0x42,0x43,0x44,0x01,0x00,0x05,0x00,0x0d,0x00,0x0f,0x00,0x0e] 这样的一个压缩串能解压成什么呢？首先，先读一个 control byte，在这个例子里面就是 0xf0，也就是二进制的 11110000。从最低位开始看：</p>
 <ul>
 <li>每看到一个 0 bit，就将 sp 的下一个字节原样写到结果 dp 里。</li>
 <li>每看到一个 1 bit，就再读两个字节 byte1 和 byte2, len = [byte1 的低4位] + 3，off = [byte1 的高4位] * 256 + [byte2]。如果 len == 18, 那么再读一个字节 byte3，len += byte3。然后从 dp 的末尾往前 off 个字节拷贝 len 个字节到 dp 里。</li>

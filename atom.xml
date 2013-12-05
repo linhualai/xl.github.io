@@ -208,7 +208,7 @@ ResponseSource Status ResponseHeaders (Source (ResourceT IO) (Flush Builder))</c
 <p>这节阐述连接超和缓存文件描述符。</p>
 <h3 id="连接计时器">连接计时器</h3>
 <p>为了防备 slowloris 攻击，用户长时间不多发点数据连接就被掐断了。Haskell 有个库函数叫<code>timeout</code>：</p>
-<pre><code>Int -&gt; IO a -&gt; IO (Maybe a)</code></pre>
+<pre><code>timeout :: Int -&gt; IO a -&gt; IO (Maybe a)</code></pre>
 <p>第一个参数是超时毫秒数，第二个参数是一个 IO 操作。<code>timeout</code>函数返回一个 IO 类型的 <code>Maybe a</code>。<code>Maybe</code> 又是啥：</p>
 <pre><code>data Maybe a = Nothing | Just a</code></pre>
 <p><code>Nothing</code> 说明有错误(不过没说原因)，<code>Just</code>则是一个成功的结果<code>a</code>。所以 IO 操作没有在指定时间完成的话，<code>timeout</code>函数返回一个<code>Nothing</code>，反之则返回一个包在<code>Just</code>中的结果。这里也可以看出 Haskell 描述的方式多么流畅。</p>

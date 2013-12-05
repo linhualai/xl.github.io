@@ -1,6 +1,6 @@
 ---
-title: Haskell 的高性能 Web 服务器(译文)
-published: 2013-12-05
+title: Warp : Haskell 的高性能 Web 服务器(译文)
+published: 2013-12-06
 excerpt: 
 tags: Haskell,Network
 ---
@@ -8,17 +8,17 @@ tags: Haskell,Network
 ## 按
 GHC 7.8 马上就要发布了。一个很大的改进就是加入了本文所说的并行 IO 管理器。从此之后 Haskell 在高性能服务器领域将不再会有对手。`nginx`和`Erlang`为无法撼动了。绝对在 c1000k 中遥遥领先。
 
-Kazu Yamamoto 和 Michael Snoyman 是网络编程和高手，这篇文章讲述了他们创造荣耀的过程。我翻译肯定错误百出，建议英语过了三级的同学都去看原文，原文绝对精彩。原文在：[Warp](http://aosabook.org/en/posa/warp.html)。话说[AOSA](http://aosabook.org)每篇文章都相当不错。
+Kazu Yamamoto 和 Michael Snoyman 是网络编程和高手，这篇文章讲述了他们创造荣耀的过程。我翻译想必是错误百出，建议英语过了三级的同学都去看原文，原文绝对精彩。原文在：[AOSA:Warp](http://aosabook.org/en/posa/warp.html)。话说[AOSA](http://aosabook.org)每篇文章都相当不错。
 
 # Warp
 
 作者: Kazu Yamamoto, Michael Snoyman and Andreas Voellmy
 
-Warp 是 Haskell(一种纯函数式编程语言) 的一个高性能的 HTTP 服务器端程序库。Yesod 和 `mighty` 都是用 Warp 来实现的，Yesod 是一个 web 应用框架，`mightty` 则是一个 HTTP 服务器。我们做过测试，`mightty` 性能可以与 `nginx` 相提并论了，这篇文章将会阐述 Warp 的架构以及为什么它达到能这样的性能。Warp能运行在 Linux，BSD 类，Mac 和 Windows 上，但简单起见，我们只谈 Linux 环境。
+Warp 是 Haskell(一种纯函数式编程语言) 的一个高性能的 HTTP 服务器端程序库。Yesod 和 `mighty` 都是用 Warp 来实现的，Yesod 是一个 web 应用框架，`mighty` 则是一个 HTTP 服务器。我们做过测试，`mighty` 的性能可以与 `nginx` 相提并论了，这篇文章将会阐述 Warp 的架构以及为什么它能达到这样的性能。Warp能运行在 Linux，BSD 系列，Mac 和 Windows 上，但简单起见，我们只谈 Linux 环境。
 
 ## Haskell 中的网络编程
 
-很多人会觉得 FP 语言都是慢如蜗牛而且是很不实用的。其实不然，Haskell 就提供的一个近于完美的 网络编程方法，这得归功于 Haskell 的旗舰编译器 GHC。GHC 提供了轻量且强健的用户态线程。这一节我们就来回顾一下常见的几种服务器端网络编程模型，然后和 Haskell 比较一下。我们得到的结论是：Haskell 的便捷的抽象能力让程序员第一次有机会编写出清晰，简单的代码，同时GHC 精致的多核运行时系统又能把代码的运行速度提高到和NB的C程序员手写优化过的代码一样快。这在以前是不可想象的。
+很多人会觉得 FP 语言都是慢如蜗牛而且很不实用。其实不然，Haskell 就提供的一个近于完美的网络编程方法，这得力于 Haskell 的旗舰编译器 GHC。GHC 提供了轻量且强健的用户态线程。这一节我们就来回顾一下常见的几种服务器端网络编程模型，然后和 Haskell 比较一下。我们得到的结论是：Haskell 的便捷的抽象能力让程序员第一次有机会编写出清晰，简单的代码，同时GHC 精致的多核运行时系统又能把代码的运行速度提高到和 NB 的 C 程序员手写优化过的代码一样快。这在以前是不可想象的。
 
 ### 多线程
 
@@ -54,13 +54,13 @@ GHC 的用户态线程可以解决程序结构不清晰的问题。具体来说�
 
 深入一点细节的话，GHC 把用户态线程分用到少量的系统线程上。GHC 的多核运动时能轻巧的调度海量用户态线程，不会引起系统级上下文切换。
 
-GHC 的用户态线程是很轻量的，当代的机器跑 100000 个用户线程是毫无压力。而且相当健壮，异步的异常也被搞定了。见[Warp’s Architecture](http://aosabook.org/en/posa/warp.html#sec.warp.arch) 和 [Timers for File Descriptors](http://aosabook.org/en/posa/warp.html#sec.warp.timers)。此外，GHC 的调度器能在多核之间做负载均衡调度，充分作用多核。
+GHC 的用户态线程是很轻量的，当代的机器跑 100000 个用户线程是毫无压力。而且相当健壮，异步的异常也完全搞定。见[Warp 的架构](#warp-的架构) 和 [文件描述符计时器](#文件描述符计时器)。此外，GHC 的调度器能在多核之间做负载均衡调度，充分作用多核。
 
 用户调用的接口，逻辑上是阻塞的 IO 调用，比如读写 socket，实际上最终运行的是异步版本的 IO 调用：如果此次调用数据 ready 的话，用户线程当然不阻塞直接继续运行了；如果数据不 ready 需要等待的话，线程实际上在其需要的数据条件上注册一下告诉调度器说它在等这个事件。调度器会监测各种 IO 事件并通知各等待着的线程，让他们重新运行起来。这一切都发生在 Haskell 的运行时，对用户是透明的，完全不用程序员参与。
 
 Haskell 里面几乎所有数据结构都是不可修改的，这也意味着，多数函数都是线程安全的。GHC 在什么是时候会切换用户线程呢？答案是在分配内存的时候。Haskell 的数据不可修改使得实际上新的数据，新的内存是不停的在分配的，所以这个粒度是足够的。不明白的话可以参看一下：[such data allocation occurs regularly enough for context switching](http://www.aosabook.org/en/ghc.html)。
 
-在 Haskell 之前其实有很多语言已经实现用户态线程了，但它们得到广泛应用可能是因为要么不轻量，要么不健壮。另外有些语言则是实现了协程(coroutine)库，协程调度则是非抢占(non-preemptive)式的。Erlang 和 Haskell 一样，提供的是轻量级线程，Go 语言则使用轻量级协程(gorouting)。
+在 Haskell 之前其实有很多语言已经实现用户态线程了，但它们得到广泛应用可能是因为要么不轻量，要么不健壮。另外有些语言则是实现了协程(coroutine)库，协程调度则是非抢占(non-preemptive)式的。Erlang 和 Haskell 一样，提供的是轻量级线程，Go 语言则使用轻量级协程(goroutine)。
 
 作者写这篇文章的时候 `mighty` 使用 prefork 技术来利用多核，因为 Warp 还不支持。下图展示了这一架构。每个用户连接用一个用户态线程来处理，每个用户态线程又是在一个系统线程上跑，N 个核上又跑着 N 个系统线程。
 ![User threads with one process per core](https://raw.github.com/snoyberg/posa-chapter/master/4.png)
@@ -95,7 +95,6 @@ Haskell 中，函数的参数类型是用右向箭头隔开的，最右边的一
 
 压测的环境如下：
 
-- 
 
 - 1Gpbs 以太网连接的 "12 核" 两台机器(Intel Xeon E5645, 双网卡, 每个 CPU
  带 5 个核) connected with 1Gpbs Ethernet
@@ -137,7 +136,7 @@ x 轴是 worker 数，y 轴是每秒的吞吐量。
 
 ### 系统调用调得越少越好
 
-尽管系统调用在现代操作系统上一般都不怎么耗时，但只要调用得够多，也能成为一个大问题。实际上 Warp 处理每个请求调用了几个系统调用，有用`recv()`，`send()`和`sendfile()` (这货能让文件拷贝一点不走用户空间)。其他的系统调用如`open()`，`stat()`，`close()` 就被优化掉了。下面有一节 (TBD:Timers for file descriptors) 会再说这个细节。
+尽管系统调用在现代操作系统上一般都不怎么耗时，但只要调用得够多，也能成为一个大问题。实际上 Warp 处理每个请求调用了几个系统调用，有用`recv()`，`send()`和`sendfile()` (这货能让文件拷贝一点不走用户空间)。其他的系统调用如`open()`，`stat()`，`close()` 就被优化掉了。下面有一节 ([文件描述符计时器](#文件描述符计时器)) 会再说这个细节。
 
 我们用`strace`命令来跟踪最后调的系统调用。我们发现`nginx`居然用了一个我们不知道的`accept4`。
 
@@ -157,23 +156,19 @@ GHC 有提供调优手段，不过限制不少。只有单进程程序的调优�
 
 所以呢，我们就重实现了一下专门的 GMT 时间格式化函数。用 Haskell 的一个标准性能测试库`criterion`测试结果显示，我们的函数快不少。这样就够了么？其实在同一秒内有多个 HTTP 请求，我们需要多次格式化时间么，其实是不需要的，所以我们缓存一秒内的时间格式化结果就行了。
 
-减少重复计算，优化函数实现在 (TBD:Writing the Parser)和(TBD:Composer for HTTP response header)上还会再讲。
+减少重复计算，优化函数实现在[实现解析器](#实现解析器)和[Composer for HTTP response header](#composer-for-http-response-header)上还会再讲。
 
 ### 不要用锁
 
-不必要的锁是程序的罪恶源泉。有时候我们不知不觉就用了不少锁，比如运行时和库用了锁。要实现高性能服务器的话，我们就要找出这些锁来，尽可能地避免之。需要指出的是，锁在并行 IO manager 中更加致命。怎么找锁，怎么避免的话题放在in Section (TBD:Timers for connections) and
-Section (TBD:Memory allocation).
+不必要的锁是程序的罪恶源泉。有时候我们不知不觉就用了不少锁，比如运行时和库用了锁。要实现高性能服务器的话，我们就要找出这些锁来，尽可能地避免之。需要指出的是，锁在并行 IO manager 中更加致命。怎么找锁，怎么避免的话题放在[连接计时器](#连接计时器)和[内存分配](#内存分配)章节。
 
 ### 使用正确的数据结构很重要
 
 Haskell 处理字符串的标准库是 `String`，`String`不过是 Unicode 字符的链表。链表是 FP 的心脏，所以`String`还是很方便的。不过对于我们的高性能服务器来说，链表的性能远远不行，Unicode 也太复杂了，HTTP 其实是一面向字节流的协议。
 
-所以，我们用`ByteString`来处理字节串(或 buffer)。`ByteString`是带元数据的字节数组。有元数据的话，我们切分字符串基本就不用拷贝字节了。下面
-This is described in Section (TBD:Writing the Parser)还会细讲。
+所以，我们用`ByteString`来处理字节串(或 buffer)。`ByteString`是带元数据的字节数组。有元数据的话，我们切分字符串基本就不用拷贝字节了。下面[实现解析器](#实现解析器)部分还会细讲。
 
-关于数据结构的例子还有`Builder`和双重`IORef`。
-They are explained in Section (TBD:Composer for HTTP response header)
-and Section (TBD:Timers for connections), respectively.
+关于数据结构的例子还有`Builder`和双重`IORef`。见[Composer for HTTP response header](#composer-for-http-response-header)和[连接计时器](#连接计时器)。
 
 ## HTTP request parser
 

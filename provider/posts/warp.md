@@ -307,7 +307,7 @@ Warp 把客户端来的字节流组成一个`Source`，给客户端的字节流�
 
 为了防备 slowloris 攻击，用户长时间不多发点数据连接就被掐断了。Haskell 有个库函数叫`timeout`：
 
-    Int -> IO a -> IO (Maybe a)
+    timeout :: Int -> IO a -> IO (Maybe a)
 
 第一个参数是超时毫秒数，第二个参数是一个 IO 操作。`timeout`函数返回一个 IO 类型的 `Maybe a`。`Maybe` 又是啥：
 

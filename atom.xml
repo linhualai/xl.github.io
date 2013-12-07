@@ -16,11 +16,11 @@
     <published>2013-12-06T00:00:00Z</published>
     <updated>2013-12-06T00:00:00Z</updated>
     <summary type="html"><![CDATA[<h2 id="按">按</h2>
-<p>GHC 7.8 马上就要发布了。一个很大的改进就是加入了本文所说的并行 IO 管理器。从此之后 Haskell 在高性能服务器领域将不再会有对手。<code>nginx</code>和<code>Erlang</code>为无法撼动了。绝对在 c1000k 中遥遥领先。</p>
-<p>Kazu Yamamoto 和 Michael Snoyman 是网络编程和高手，这篇文章讲述了他们创造荣耀的过程。我翻译想必是错误百出，建议英语过了三级的同学都去看原文，原文绝对精彩。原文在：<a href="http://aosabook.org/en/posa/warp.html">AOSA:Warp</a>。话说<a href="http://aosabook.org">AOSA</a>每篇文章都相当不错。</p>
+<p>GHC 7.8 马上就要发布了。一个很大的改进就是加入了本文所说的并行 IO 管理器。从此之后 Haskell 在高性能服务器领域将不再会有对手。即使<code>nginx</code>和<code>Erlang</code>也无法撼动了。绝对在 c1000k 竞赛中遥遥领先。</p>
+<p>Kazu Yamamoto 和 Michael Snoyman 是网络编程和高手，这篇文章记录了他们创造荣耀的过程。我的翻译想必是错误百出，建议英语过了三级的同学都去看原文，原文绝对精彩。原文在：<a href="http://aosabook.org/en/posa/warp.html">POSA:Warp</a>。话说<a href="http://aosabook.org">AOSA</a>每篇文章都相当不错。</p>
 <h1 id="warp">Warp</h1>
 <p>作者: Kazu Yamamoto, Michael Snoyman and Andreas Voellmy</p>
-<p>Warp 是 Haskell(一种纯函数式编程语言) 的一个高性能的 HTTP 服务器端程序库。Yesod 和 <code>mighty</code> 都是用 Warp 来实现的，Yesod 是一个 web 应用框架，<code>mighty</code> 则是一个 HTTP 服务器。我们做过测试，<code>mighty</code> 的性能可以与 <code>nginx</code> 相提并论了，这篇文章将会阐述 Warp 的架构以及为什么它能达到这样的性能。Warp能运行在 Linux，BSD 系列，Mac 和 Windows 上，但简单起见，我们只谈 Linux 环境。</p>
+<p>Warp 是 Haskell(一种纯函数式编程语言)的一个高性能的 HTTP 服务器端程序库。Yesod 和 <code>mighty</code> 都是用 Warp 来实现的，Yesod 是一个 web 应用框架，<code>mighty</code> 则是一个 HTTP 服务器。我们做过测试，<code>mighty</code> 的性能可以与 <code>nginx</code> 相提并论了。这篇文章将会阐述 Warp 的架构以及为什么它能达到这样的性能。Warp能运行在 Linux，BSD 系列，Mac 和 Windows 上，但简单起见，我们只谈 Linux 环境。</p>
 <h2 id="haskell-中的网络编程">Haskell 中的网络编程</h2>
 <p>很多人会觉得 FP 语言都是慢如蜗牛而且很不实用。其实不然，Haskell 就提供的一个近于完美的网络编程方法，这得力于 Haskell 的旗舰编译器 GHC。GHC 提供了轻量且强健的用户态线程。这一节我们就来回顾一下常见的几种服务器端网络编程模型，然后和 Haskell 比较一下。我们得到的结论是：Haskell 的便捷的抽象能力让程序员第一次有机会编写出清晰，简单的代码，同时GHC 精致的多核运行时系统又能把代码的运行速度提高到和 NB 的 C 程序员手写优化过的代码一样快。这在以前是不可想象的。</p>
 <h3 id="多线程">多线程</h3>
@@ -46,42 +46,42 @@
 <h3 id="用户态线程">用户态线程</h3>
 <p>GHC 的用户态线程可以解决程序结构不清晰的问题。具体来说，我们可以为每一个 HTTP 连接创建一个用户态线程。每个用户态线程的处理逻辑和传统的阻塞方式一样。我们的程序又回到朴素的简单的状态，但是 GHC 又能将我们的代码转换成复杂的异步 IO，并跑在多个核上。</p>
 <p>深入一点细节的话，GHC 把用户态线程分用到少量的系统线程上。GHC 的多核运动时能轻巧的调度海量用户态线程，不会引起系统级上下文切换。</p>
-<p>GHC 的用户态线程是很轻量的，当代的机器跑 100000 个用户线程是毫无压力。而且相当健壮，异步的异常也完全搞定。见<a href="#warp-的架构">Warp 的架构</a> 和 <a href="#文件描述符计时器">文件描述符计时器</a>。此外，GHC 的调度器能在多核之间做负载均衡调度，充分作用多核。</p>
+<p>GHC 的用户态线程是很轻量的，当代的机器跑 100000 个用户线程是毫无压力。而且相当健壮，异步的异常能被妥善处理。见<a href="#warp-的架构">Warp 的架构</a> 和 <a href="#文件描述符计时器">文件描述符计时器</a>。此外，GHC 的调度器能在多核之间做负载均衡调度，充分利用多核。</p>
 <p>用户调用的接口，逻辑上是阻塞的 IO 调用，比如读写 socket，实际上最终运行的是异步版本的 IO 调用：如果此次调用数据 ready 的话，用户线程当然不阻塞直接继续运行了；如果数据不 ready 需要等待的话，线程实际上在其需要的数据条件上注册一下告诉调度器说它在等这个事件。调度器会监测各种 IO 事件并通知各等待着的线程，让他们重新运行起来。这一切都发生在 Haskell 的运行时，对用户是透明的，完全不用程序员参与。</p>
 <p>Haskell 里面几乎所有数据结构都是不可修改的，这也意味着，多数函数都是线程安全的。GHC 在什么是时候会切换用户线程呢？答案是在分配内存的时候。Haskell 的数据不可修改使得实际上新的数据，新的内存是不停的在分配的，所以这个粒度是足够的。不明白的话可以参看一下：<a href="http://www.aosabook.org/en/ghc.html">such data allocation occurs regularly enough for context switching</a>。</p>
-<p>在 Haskell 之前其实有很多语言已经实现用户态线程了，但它们得到广泛应用可能是因为要么不轻量，要么不健壮。另外有些语言则是实现了协程(coroutine)库，协程调度则是非抢占(non-preemptive)式的。Erlang 和 Haskell 一样，提供的是轻量级线程，Go 语言则使用轻量级协程(goroutine)。</p>
+<p>在 Haskell 之前其实有很多语言已经实现用户态线程了，但它们未得到广泛应用可能是因为它们要么不轻量，要么不健壮。另外有些语言则是实现了协程(coroutine)库，协程调度则是非抢占(non-preemptive)式的。Erlang 和 Haskell 一样，提供的是轻量级线程，Go 语言则使用轻量级协程(goroutine)。</p>
 <p>作者写这篇文章的时候 <code>mighty</code> 使用 prefork 技术来利用多核，因为 Warp 还不支持。下图展示了这一架构。每个用户连接用一个用户态线程来处理，每个用户态线程又是在一个系统线程上跑，N 个核上又跑着 N 个系统线程。 <img src="https://raw.github.com/snoyberg/posa-chapter/master/4.png" alt="User threads with one process per core" /></p>
-<p>我们发现 GHC 运动时库中的 IO manager 组件是一个性能瓶颈。为了解决这个问题，我们开发了一版 <code>parallel IO manager</code>，通过在每个核上都跑一个事件注册表和事件监测器极大的提升了在多核上的可扩展性。使用了这个并行 IO 调度器的 Haskell 程序跑在多核上时，会起多个 OI 调度器来利用多核。每个用户态线程会被调度到其中的一下核上。</p>
+<p>我们发现 GHC 运动时库中的 IO manager 组件是一个性能瓶颈。为了解决这个问题，我们开发了一版 <code>parallel IO manager</code>，通过在每个核上都跑一个事件注册表和事件监测器极大的提升了在多核上的可扩展性。使用了这个并行 IO 调度器的 Haskell 程序跑在多核上时，会起多个 IO 调度器来利用多核。每个用户态线程会被调度到其中的一下核上。</p>
 <figure>
 <img src="https://raw.github.com/snoyberg/posa-chapter/master/5.png" alt="User threads in a sigle process" /><figcaption>User threads in a sigle process</figcaption>
 </figure>
-<p>会包含这个新的并行 IO 调度器的 GHC 新版本会在 2013 年秋天发布(译者注：已然跳票，我都要穿冬衣了也还没用上 7.8)。Warp 不用任何修改就能用上多核了，<code>mighty</code> 用的 prefork 也可以退修了。</p>
+<p>包含这个新的并行 IO 调度器的 GHC 新版本会在 2013 年秋天发布(译者注：已然跳票，我都要穿冬衣了也还没用上 7.8)。Warp 不用任何修改就能用上多核了，<code>mighty</code> 用的 prefork 也可以退休了。</p>
 <h2 id="warp-的架构">Warp 的架构</h2>
-<p>Warp 是个网络应用接口(Web Application Interface，WAI) 的引擎。它运行在 HTTP 协议上的 WAI 应用。上面提到的 Yesod 和 <code>mighty</code> 就是 WAI 应用的例子。</p>
+<p>Warp 是个网络应用接口(Web Application Interface，WAI) 的引擎。它是运行在 HTTP 协议上的 WAI 应用。上面提到的 Yesod 和 <code>mighty</code> 就是 WAI 应用的例子。</p>
 <figure>
 <img src="https://raw.github.com/snoyberg/posa-chapter/master/wai.png" alt="Web Application Interface (WAI)" /><figcaption>Web Application Interface (WAI)</figcaption>
 </figure>
 <p>WAI 应用的类型如下：</p>
 <pre><code>type Application = Request -&gt; ResourceT IO Response</code></pre>
-<p>Haskell 中，函数的参数类型是用右向箭头隔开的，最右边的一个类型则是函数的返回类型。上面的定义的含义是：WAI 应用接收一个 <code>Request</code> 并返回一个 <code>Response</code>，<code>ResouceT IO</code> 表示这个地方可能需求用到可控的 IO。</p>
+<p>Haskell 中，函数的参数类型是用右向箭头隔开的，最右边的一个类型则是函数的返回类型。上面的定义的含义是：WAI 应用接收一个 <code>Request</code> 并返回一个 <code>Response</code>，<code>ResouceT IO</code> 表示这个地方可能需要用到可控的 IO。</p>
 <p>一个连接过来后，一个专门的用户态线程就会创建(spawn)来处理之。这个线程先接收客户端的 HTTP 请求，解析成一下<code>Request</code>，然后 Warp 把这个<code>Request</code> 传给这个 WAI 应用，并等待它的一个<code>Response</code>返回。最后，Warp 根据<code>Response</code>生成 HTTP 返回，并通过网络发送给客户端。如下图。</p>
 <figure>
 <img src="https://raw.github.com/snoyberg/posa-chapter/master/warp.png" alt="The architecture of Warp" /><figcaption>The architecture of Warp</figcaption>
 </figure>
-<p>用户线程不断的重复上面的步骤，直到该连接被客户端或者收到了错误的请求，或者这个用户线程很久没有收到一定量网络数据，也会被一个特殊的管理线程给喀嚓掉。</p>
+<p>用户线程不断的重复上面的步骤，直到该连接被客户端断掉或者收到了错误的请求，或者这个用户线程很久没有收到一定量网络数据，也会被一个特殊的管理线程给喀嚓掉。</p>
 <h2 id="warp-的性能表现">Warp 的性能表现</h2>
 <p>在介绍我们如何改善了 Warp 的性能前呢，我们先来看一下我们优化后的结果。下面的结果是用 2.8.4 的<code>mighty</code>(采用 Warp 1.3.8.1) 和 1.4.0 的<code>nginx</code>跑出来的。</p>
 <p>压测的环境如下：</p>
 <ul>
-<li>1Gpbs 以太网连接的 “12 核” 两台机器(Intel Xeon E5645, 双网卡, 每个 CPU 带 5 个核) connected with 1Gpbs Ethernet</li>
+<li>1Gpbs 以太网连接的 “12 核” 两台机器(Intel Xeon E5645, 双网卡, 双 CPU，每个 CPU 带 6 个核)</li>
 <li>一台运行 Linux 3.2.0(Ubuntu 12.04 LTS)</li>
 <li>另一台跑的是 FreeBSD 9.1</li>
 </ul>
-<p>测试工具我们用过不少，早前我们用的是<code>httperf</code>，不过我们发现其用的是<code>select</code>调用，而且是单线程的，很快就测试就跟不上多核 HTTP 服务器的性能了。所以你们就切换到<code>weighttp</code>上，它用的是<code>libev</code>(和 epoll 是一路的)能跑在多核上。在 FreeBSD 上我们这样起了一个<code>weighttp</code>：</p>
+<p>测试工具我们用过不少，早前我们用的是<code>httperf</code>，不过我们发现其用的是<code>select</code>调用，而且是单线程的，很快就测试就跟不上多核 HTTP 服务器的性能了。所以我们就切换到<code>weighttp</code>上，它用的是<code>libev</code>(和 epoll 是一路的)能跑在多核上。在 FreeBSD 上我们这样起了一个<code>weighttp</code>：</p>
 <pre><code>weighttp -n 100000 -c 1000 -t 10 -k http://&lt;ip_address&gt;:&lt;port_number&gt;/</code></pre>
 <p>这样我们就用 10 个线程起了 1000 个 HTTP 连接，每个连接发送 100 个请求来测试。</p>
 <p>被测试的网络服务器则是跑在 Linux 上。对于每个请求，它返回一个<code>index.html</code>。用的是<code>nginx</code>的默认<code>index.html</code>，大小为 151 字节。</p>
-<p>Linux/FreeBSD 都有许多参数可以调。需求仔细调一下这样参数。<a href="http://gwan.com/en_apachebench_httperf.html">ApacheBench &amp; HTTPerf</a>是一个不错的教程。对<code>mighty</code>和<code>nginx</code>下面的东东一定是要调一下的：</p>
+<p>Linux/FreeBSD 都有许多参数可以调。最好仔细调一下这些参数。<a href="http://gwan.com/en_apachebench_httperf.html">ApacheBench &amp; HTTPerf</a>是一个不错的教程。对<code>mighty</code>和<code>nginx</code>下面的东东一定是要调一下的：</p>
 <ul>
 <li>打开文件描述符缓存</li>
 <li>关闭日志</li>
@@ -93,7 +93,7 @@
 </figure>
 <p>x 轴是 worker 数，y 轴是每秒的吞吐量。</p>
 <ul>
-<li><p>mighty 2.8.4 (GHC 7.7): 用 GHC 7.7.20130504 (可以看成是 GHC 7.8)编译的。用上了并行的 IO manager，只起了一个 worker。给 GHC 的运行时参数是<code>+RTS -qa -A128m -N&lt;x&gt;</code>， <x> 是机器核娄，128m 是 GC 的内存分配空间大小。</p></li>
+<li><p>mighty 2.8.4 (GHC 7.7): 用 GHC 7.7.20130504 (可以看成是 GHC 7.8)编译的。用上了并行的 IO manager，只起了一个 worker。给 GHC 的运行时参数是<code>+RTS -qa -A128m -N&lt;x&gt;</code>， <x> 是机器核数，128m 是 GC 的内存分配空间大小。</p></li>
 <li><p>mighty 2.8.4 (GHC 7.6.3): 用当前稳定版 GHC 7.6.3 编译的结果。</p></li>
 </ul>
 <h2 id="关键点">关键点</h2>
@@ -108,23 +108,23 @@
 <p>尽管系统调用在现代操作系统上一般都不怎么耗时，但只要调用得够多，也能成为一个大问题。实际上 Warp 处理每个请求调用了几个系统调用，有用<code>recv()</code>，<code>send()</code>和<code>sendfile()</code> (这货能让文件拷贝一点不走用户空间)。其他的系统调用如<code>open()</code>，<code>stat()</code>，<code>close()</code> 就被优化掉了。下面有一节 (<a href="#文件描述符计时器">文件描述符计时器</a>) 会再说这个细节。</p>
 <p>我们用<code>strace</code>命令来跟踪最后调的系统调用。我们发现<code>nginx</code>居然用了一个我们不知道的<code>accept4</code>。</p>
 <p>在 Haskell 的标准网络库里，监听一个 socket 是会用上非阻塞的标志的，不过新连接过来时也要将这个进来的 socket 再设置一下这个非阻塞标志。标准库是这么搞的：调用了两次<code>fcntl()</code>，一次获取当前标志，另一次再设置新的非阻塞标志。</p>
-<p>Linux 下即使监听的 socket 是有非阻塞标志，新连接过来的 socket 也是默认不设置非阻塞标志的。<code>accept()</code>已经是这样的了，所以就有这个<code>accept4()</code>，它可以在新连接过来是设置好非阻塞标志，这样那两次<code>fcntl()</code>调用就避免了。这一改动已经合到标准库里了。</p>
+<p>Linux 下即使监听的 socket 是有非阻塞标志，新连接过来的 socket 也是默认不设置非阻塞标志的。<code>accept()</code>已经是这样的了，所以就有这个<code>accept4()</code>，它可以在新连接过来时设置好非阻塞标志，这样那两次<code>fcntl()</code>调用就避免了。这一改动已经合到标准库里了。</p>
 <h3 id="减少重复计算优化每个函数实现">减少重复计算，优化每个函数实现</h3>
 <p>GHC 有提供调优手段，不过限制不少。只有单进程程序的调优才准确。这样我们只能搞点非常规手段了。</p>
-<p><code>mighty</code>考虑了这种情况。当我们配置<code>mighty</code>的 worker 数 N 在于 2 时，它会创建 N 个工作进程，父进程只用来收发控制信号。不过如果 N 为 1，则根本就不多创建进程了，初始进程就用来服务 HTTP 请求。另外如果有设置调试模式的话，<code>mighty</code>也会保持在终端运行(不变成后台进程)。</p>
-<p>调优<code>mighty</code>的时候我们震惊的发现标准库里的时间格式化函数占了程序的多数时间。我们知道，HTTP 服务器是要在 Header 里返回 Date:，Last-Modified:等的：</p>
+<p><code>mighty</code>考虑了这种情况。当我们配置<code>mighty</code>的 worker 数 N 多于 2 时，它会创建 N 个工作进程，父进程只用来收发控制信号。不过如果 N 为 1，则根本就不多创建进程了，初始进程就用来服务 HTTP 请求。另外如果有设置调试模式的话，<code>mighty</code>也会保持在终端运行(不变成后台进程)。</p>
+<p>调优<code>mighty</code>的时候我们震惊的发现标准库里的时间格式化函数占了程序的多数时间。我们知道，HTTP 服务器是要在 Header 里返回 Date:，Last-Modified: 等的：</p>
 <pre><code>Date: Mon, 01 Oct 2012 07:38:50 GMT</code></pre>
 <p>所以呢，我们就重实现了一下专门的 GMT 时间格式化函数。用 Haskell 的一个标准性能测试库<code>criterion</code>测试结果显示，我们的函数快不少。这样就够了么？其实在同一秒内有多个 HTTP 请求，我们需要多次格式化时间么，其实是不需要的，所以我们缓存一秒内的时间格式化结果就行了。</p>
 <p>减少重复计算，优化函数实现在<a href="#实现解析器">实现解析器</a>和<a href="#composer-for-http-response-header">Composer for HTTP response header</a>上还会再讲。</p>
 <h3 id="不要用锁">不要用锁</h3>
-<p>不必要的锁是程序的罪恶源泉。有时候我们不知不觉就用了不少锁，比如运行时和库用了锁。要实现高性能服务器的话，我们就要找出这些锁来，尽可能地避免之。需要指出的是，锁在并行 IO manager 中更加致命。怎么找锁，怎么避免的话题放在<a href="#连接计时器">连接计时器</a>和<a href="#内存分配">内存分配</a>章节。</p>
+<p>不必要的锁是程序的罪恶源泉。有时候我们不知不觉就用了不少锁，假如运行时和库用了锁。要实现高性能服务器的话，我们就要找出这些锁来，尽可能地避免之。需要指出的是，锁在并行 IO manager 中更加致命。怎么找锁，怎么避免的话题放在<a href="#连接计时器">连接计时器</a>和<a href="#内存分配">内存分配</a>章节。</p>
 <h3 id="使用正确的数据结构很重要">使用正确的数据结构很重要</h3>
 <p>Haskell 处理字符串的标准库是 <code>String</code>，<code>String</code>不过是 Unicode 字符的链表。链表是 FP 的心脏，所以<code>String</code>还是很方便的。不过对于我们的高性能服务器来说，链表的性能远远不行，Unicode 也太复杂了，HTTP 其实是一面向字节流的协议。</p>
 <p>所以，我们用<code>ByteString</code>来处理字节串(或 buffer)。<code>ByteString</code>是带元数据的字节数组。有元数据的话，我们切分字符串基本就不用拷贝字节了。下面<a href="#实现解析器">实现解析器</a>部分还会细讲。</p>
 <p>关于数据结构的例子还有<code>Builder</code>和双重<code>IORef</code>。见<a href="#composer-for-http-response-header">Composer for HTTP response header</a>和<a href="#连接计时器">连接计时器</a>。</p>
 <h2 id="http-request-parser">HTTP request parser</h2>
-<p>除了高效的并发和多核环境下的 I/O 之外，其它方面也是要考虑的。在每个核上 Warp 也自然要都高效才行。这里最重要的就是 HTTP 的 request 解析了。它需要从 socket 中的字节流解析岀请求行和诸多 header，不过 body 就留给应用自己处理。它解析出的信息要传给应用( Yesod 应用也好，<code>mighty</code>应用也好)去构建 response.</p>
-<p>处理这个请求 body 也颇考验功力。Warp 完全支持 HTTP 的流水线（pipelining)和分块(chunked)。这样 Warp 就得“组块”被分块的请求。支持流水线时，会在一个连接里传送多个请求，Warp 就必须保证应用拿到过多的数据，把下一个的 request 的一部分数据也给偷走了，也要保证不残留数据，不然下一个 request 就不知道从哪开始读数据了。</p>
+<p>除了高效的并发和多核环境下的 I/O 之外，其它方面也是要考虑的。在每个核上 Warp 也自然要都高效才行。这里最重要的就是 HTTP 的 request 解析了。它需要从 socket 中的字节流解析岀请求行(request line)和诸多 header，不过 body 就留给应用自己处理。它解析出的信息要传给应用(Yesod 应用也好，<code>mighty</code>应用也好)去构建 response.</p>
+<p>处理这个请求 body 也颇考验功力。Warp 完全支持 HTTP 的流水线（pipelining)和分块(chunked)。这样 Warp 就得“组块”(de-chunk)被分块的请求。支持流水线时，会在一个连接里传送多个请求，Warp 就必须保证应用不会拿到过多的数据，把下一个的 request 的一部分数据也给偷走了，也要保证不残留数据，不然下一个 request 就不知道从哪开始读数据了。</p>
 <p>举个简单的例子，假设用户发了这样个请求过来：</p>
 <pre><code>POST /some/path HTTP/1.1
 Transfer-Encoding: chunked
@@ -141,9 +141,9 @@ GET / HTTP/1.1</code></pre>
 <h3 id="实现解析器">实现解析器</h3>
 <p>Haskell 的强大解析能力是名声在外的。传统上解析用的是组合子(combinator)来组织程序，比如<code>Parsec</code>和<code>Attoparsec</code>。<code>Parsec</code>和<code>Attoparsec</code>的文本解析模块是基于 Unicode 的，显然在 HTTP 头这种纯 ASCII 的协议解析上面毫无必要，而且开销太大了。</p>
 <p><code>Attoparsec</code>其实也是提供了二进制解析接口的，避开 Unicode 开销，这已经是性能极好的库了。但是比手工裸写的解析器还是有差距的，Warp 里我们就自己手动解析。</p>
-<p>这里有个小问题，我们的字节数据是怎么在内存里放的。答案是<code>ByteString</code>，<code>ByteString</code>其实由三部分组成的：指向一块内存的指针，数据开始的 offset，和数据的大小。</p>
+<p>这里我们小小科普一下，我们的字节数据是怎么在内存里放的。答案是<code>ByteString</code>，<code>ByteString</code>其实由三部分组成的：指向一块内存的指针，数据开始的 offset，和数据的大小。</p>
 <p>初看之下这个 offset 信息是多余的，指针的位置就可以当成是我们数据的开始位置。有这一个 offset 的好处是我们可以多个<code>ByteString</code>之间共享那一块内存的不同部分(所谓的切分，splicing)。那这些数据共享会不会引起篡改问题呢？Haskell 的所有数据结构都是不可变的，因此也就没有篡改这一说了。当没有<code>ByteString</code>引用那块内存时，它也就被回收了。</p>
-<p>这种安排正合我们的意，客户端来了一个请求，Warp 分配一下比较大(目前为 4096 字节)的一个 chunk 来存放请求行和请求 header，基本上都能放下。然后 Warp 就用我们手写的解析器来解析。来看一下为什么能解析得飞快：</p>
+<p>这种安排正合我们的意，客户端来了一个请求，Warp 分配一下比较大(目前为 4096 字节)的一个 chunk 来存放请求行和请求 header，大部分情况下都能放下。然后 Warp 就用我们手写的解析器来解析。来看一下为什么能解析得飞快：</p>
 <ol type="1">
 <li><p>在内存块中我们只用查找换行符就行了，bytestring 库中的查找函数是用 C 函数中的像<code>memchr</code>来实现的，非常之快。(有些多行的 header 要复杂一些，不过原理是一样的)</p></li>
 <li><p>解析过程根本不用再分配内存了，字符串切分直接指向原来的大内存块(见下图)。这里我们可以自豪一下，这里的做法比 C 语言里面的一般字符串处理还高效。C 语言里，字符串是用结尾的，切分字符串导致内存的不断分配和拷贝。</p></li>
@@ -165,7 +165,7 @@ GET / HTTP/1.1</code></pre>
 <li><p>和换行符切分一样，<code>/</code>查找也是飞快的。</p></li>
 <li><p>URL decode 用的是打表，没有分支，每次都是一个内存寻址就行了。</p></li>
 <li><p><code>text</code> 库处理 UTF-8很高效。其内存也很紧凑。</p></li>
-<li><p>Haskell 还有延时示值的特性，比如你不需求用到 path，那么相应的解析代码就不会执行。</p></li>
+<li><p>Haskell 还有延时示值的特性，比如你不需要用到 path，那么相应的解析代码就不会执行。</p></li>
 </ol>
 <p>最后还剩的就是“合块”了，这个就更简单了。解析一个 16 进制数字，再读这么多个数字的字节，最后再合在一起。这里也没有内存的拷贝。</p>
 <h3 id="conduit">Conduit</h3>
@@ -183,8 +183,8 @@ GET / HTTP/1.1</code></pre>
 <p>还用 gzip 中间件的这个例子，刚开始有一个<code>Source</code>是应用的输出，它接到<code>gzip</code> <code>conduit</code>上，<code>Source</code>不断输出字节，<code>couduit</code>中的<code>zlib</code>包不断读入这些字节，然后输出压缩后的字节，又接到 Warp 或者别的中间件上。最终 Warp 把压缩后的数据通过 socket 传给客户端。在这过程中，只消耗了最少的内存，网络断开的话，剩余的压缩都不会继续。这样 CPU 和垃圾收集器的开销都已经是最小的了。</p>
 <p>说起 conduit，这又是一个很大的话题，这里就不多说了，只要知道用 conduit 是 Warp 获得高性能的一个重要因素就行了。</p>
 <h3 id="slowloris-攻击防护">Slowloris 攻击防护</h3>
-<p>有一个问题是值得我们关注的: <a href="http://en.wikipedia.org/wiki/Slowloris">slowloris 攻击</a>。这是一种拒绝服务攻击(Denial of Service，DOS)。攻击者通过慢速发送请求，可以在同样的硬件和带宽的发起更多连接，每个连接都会消耗服务器的一定资源，不管这些连接上有没有数据在传送。当这种连接太多时，服务器的资源就会不够。因此，要是一个连接长时间不发送一定量的数据，我们得把这个连接给断了。</p>
-<p>下面我们讲讲超时管理器，它是 slowloris 攻击检测中的核心。每个连接上有个计时器，每当有数据来这个计时器就被更新一下。Warp 中这是在 conduit 这一级就做好了。上面提到输入数据是一个<code>Source</code>，每当一个新数据 chunk 来了，计时器就更新一下。这个更新就是一个内存修改，所以是很快的，slowloris 检测基本对我们的性能不会有太大的反作用。</p>
+<p>有一个问题是值得我们关注的: <a href="http://en.wikipedia.org/wiki/Slowloris">slowloris 攻击</a>(慢速连接攻击)。这是一种拒绝服务攻击(Denial of Service，DOS)。攻击者通过慢速发送请求，可以在同样的硬件和带宽的发起更多连接，不管这些连接上有没有数据在传送，每个连接都会消耗服务器的一定资源。当这种连接太多时，服务器的资源就会不够。因此，要是一个连接长时间不发送一定量的数据，我们得把这个连接给断了。</p>
+<p>下面我们讲讲超时管理器，它是 slowloris 攻击检测中的核心。每个连接上有个计时器，每当有数据来这个计时器就被更新一下。Warp 中这是在 conduit 这一级就做好了。上面提到输入数据是一个<code>Source</code>，每当一个新数据 chunk 来了，计时器就更新一下。这个更新就只是一个内存修改，所以是很快的，slowloris 检测基本对我们的性能不会有太大的反作用。</p>
 <h2 id="http-response-composer">HTTP response composer</h2>
 <p>这节谈谈 Warp 中的 HTTP response 组织。一个 WAI <code>Response</code> 可以有三种情况：</p>
 <pre><code>ResponseFile Status ResponseHeaders FilePath (Maybe FilePart)
@@ -239,12 +239,12 @@ ResponseSource Status ResponseHeaders (Source (ResourceT IO) (Flush Builder))</c
 <h2 id="未来展望">未来展望</h2>
 <p>对于如何进一步优化 Warp，我们有许多想法，这里拿两个来讲一下。</p>
 <h3 id="内存分配">内存分配</h3>
-<p>每次收发数据包，都需要分配内存 buffer。这些 buffer 以<em>钉住</em>(pinned)的形式分配，这样这些 buffer 可以在 C 和 Haskell 之间共享。我们希望每次系统调用收发的数据能多一点，这些 buffer 一般会是中等大小的。不幸的是，GHC 分配稍大一点(64 位机上是大于 409 字节)的钉住内存会用到运行时的一个锁。当内存频繁分配时，这在机器超过 16 核时就成为了我们的系统环境。</p>
+<p>每次收发数据包，都需要分配内存 buffer。这些 buffer 以<em>钉住</em>(pinned)的形式分配，这样这些 buffer 可以在 C 和 Haskell 之间共享。我们希望每次系统调用收发的数据能多一点，这些 buffer 一般会是中等大小的。不幸的是，GHC 分配稍大一点(64 位机上是大于 409 字节)的钉住内存会用到运行时的一个锁。当内存频繁分配，机器超过 16 核时就成为了我们的系统瓶颈。</p>
 <p>我们开始分析 HTTP response header 生成时，这种针住大内存的分配对性能的影响。GHC 对我们的提供了 <em>eventlog</em> 工具，它能记录每个事件的时间戳。在内存分配的前后我们挂上函数记录用户事件的时间，然后和<code>mighty</code>编译在一起，得到的事件日志(event log)结果如下：</p>
 <figure>
 <img src="https://raw.github.com/snoyberg/posa-chapter/master/eventlog.png" alt="eventlog" /><figcaption>eventlog</figcaption>
 </figure>
-<p>小红块就是我们挂上的事件，它们之间的时间自然就是内存分配的时间了。粗略估计大概占到 HTTP 会话中的 1/10。怎么实现一下无锁的内存分配算法，还在讨论中。</p>
+<p>小红块就是我们挂上的事件，它们之间的时间自然就是内存分配的时间了。粗略估计大概占到 HTTP 会话中的 1/10。怎么实现一个无锁的内存分配算法，还在讨论中。</p>
 <h3 id="新式惊群">新式惊群</h3>
 <p>惊群(Thundering herd)是一下历久弥新的问题。</p>
 <p>假设多个进程或系统线程预创建着监听同一个 socket。他们都在这个 socket 上<code>accept()</code>。一个连接进来，老版本的 Linux 和 FreeBSD 会唤醒所有这些进程，但只有一个进程拿到这个连接，其它进程接着 sleep。这样的上下文切换是个严重的性能问题。这就是所谓的<em>惊</em> <em>群</em>。较新版本的 Linux 和 FreeBSD 只唤醒一个进程，所以这个问题已经成为历史了。</p>
